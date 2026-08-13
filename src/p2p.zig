@@ -30,7 +30,7 @@ pub const Peer = struct {
     listen_thread: ?std.Thread = null,
     callback: ?EmbeddingCallback = null,
     
-    pub fn init(allocator: mem.Allocator, io: Io, sock: Io.net.Socket, shared_secret: [32]u8, is_server: bool, peer_pub_key: [32]u8) !*Peer {
+    pub fn init(allocator: mem.Allocator, io: Io, sock: Io.net.Socket, shared_secret: [32]u8, psk: [32]u8, is_server: bool, peer_pub_key: [32]u8) !*Peer {
         const peer = try allocator.create(Peer);
         peer.* = .{
             .allocator = allocator,
@@ -42,11 +42,21 @@ pub const Peer = struct {
             .tx_key = undefined,
         };
         
-        // Derive directional keys to avoid nonce reuse
+        // Derive directional keys combining X25519 secret and Swarm PSK
         var c2s_key: [32]u8 = undefined;
         var s2c_key: [32]u8 = undefined;
-        crypto.hash.Blake3.hash(shared_secret ++ "client_to_server", &c2s_key, .{});
-        crypto.hash.Blake3.hash(shared_secret ++ "server_to_client", &s2c_key, .{});
+        
+        var hasher1 = crypto.hash.Blake3.init(.{});
+        hasher1.update(&shared_secret);
+        hasher1.update(&psk);
+        hasher1.update("client_to_server");
+        hasher1.final(&c2s_key);
+        
+        var hasher2 = crypto.hash.Blake3.init(.{});
+        hasher2.update(&shared_secret);
+        hasher2.update(&psk);
+        hasher2.update("server_to_client");
+        hasher2.final(&s2c_key);
         
         if (is_server) {
             peer.rx_key = c2s_key;
@@ -133,6 +143,9 @@ pub const Peer = struct {
             const topic = pt[2 .. 2 + topic_len];
             const vec_len = mem.readInt(u32, pt[2 + topic_len .. 2 + topic_len + 4][0..4], .little);
             
+            // SECURITY: Prevent OOM (Out-Of-Memory) DoS by bounding vector size
+            if (vec_len > 10_000_000) continue; // Max ~20MB vector
+            
             const vec_byte_len = vec_len * @sizeOf(f16);
             if (pt.len < 2 + topic_len + 4 + vec_byte_len) continue;
             
@@ -154,6 +167,7 @@ pub const Node = struct {
     io: Io,
     keypair: X25519.KeyPair,
     public_key: [32]u8, // Only 32 bytes for pure X25519!
+    psk: [32]u8,
     tcp_port: u16,
     server_socket: ?Io.net.Socket = null,
     discovery_socket: ?Io.net.Socket = null,
@@ -165,18 +179,27 @@ pub const Node = struct {
     discovery_send_thread: ?std.Thread = null,
     stop_signal: std.atomic.Value(bool) = std.atomic.Value(bool).init(false),
     
-    pub fn init(allocator: mem.Allocator, listen_port: u16) !Node {
+    pub fn init(allocator: mem.Allocator, listen_port: u16, swarm_secret: []const u8) !Node {
         const threaded_io = try allocator.create(Io.Threaded);
         threaded_io.* = Io.Threaded.init(allocator, .{});
         const io = threaded_io.io();
         
         const keypair = X25519.KeyPair.generate(io);
+        
+        var psk: [32]u8 = undefined;
+        if (swarm_secret.len > 0) {
+            crypto.hash.Blake3.hash(swarm_secret, &psk, .{});
+        } else {
+            @memset(&psk, 0);
+        }
+        
         var self = Node{
             .allocator = allocator,
             .threaded_io = threaded_io,
             .io = io,
             .keypair = keypair,
             .public_key = keypair.public_key,
+            .psk = psk,
             .tcp_port = listen_port,
             .peers = std.ArrayListUnmanaged(*Peer).empty,
             .peers_mutex = Io.RwLock.init,
@@ -230,7 +253,7 @@ pub const Node = struct {
         
         const shared_secret = try X25519.scalarmult(self.keypair.secret_key, target_pub);
         
-        const peer = try Peer.init(self.allocator, self.io, sock, shared_secret, false, target_pub);
+        const peer = try Peer.init(self.allocator, self.io, sock, shared_secret, self.psk, false, target_pub);
         peer.callback = self.callback;
         
         peer.listen_thread = try std.Thread.spawn(.{}, Peer.listenLoop, .{peer});
@@ -285,7 +308,7 @@ pub const Node = struct {
                 continue;
             };
             
-            const peer = Peer.init(self.allocator, self.io, client_sock, shared_secret, true, client_pub_key) catch {
+            const peer = Peer.init(self.allocator, self.io, client_sock, shared_secret, self.psk, true, client_pub_key) catch {
                 self.io.vtable.netClose(self.io.userdata, &.{client_sock});
                 continue;
             };

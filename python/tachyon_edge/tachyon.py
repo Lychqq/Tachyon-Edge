@@ -1,4 +1,5 @@
 import ctypes
+import struct
 import os
 import sys
 
@@ -40,7 +41,7 @@ class CPacket(ctypes.Structure):
 CCallbackType = ctypes.CFUNCTYPE(None, CPacket)
 
 # Map exported C functions
-lib.node_init.argtypes = [ctypes.c_uint16]
+lib.node_init.argtypes = [ctypes.c_uint16, ctypes.c_char_p, ctypes.c_size_t]
 lib.node_init.restype = ctypes.c_void_p
 
 lib.node_deinit.argtypes = [ctypes.c_void_p]
@@ -74,9 +75,10 @@ lib.node_start_listener.argtypes = [ctypes.c_void_p, CCallbackType]
 lib.node_start_listener.restype = ctypes.c_int
 
 class Tachyon:
-    def __init__(self, port: int):
-        """Initializes a new SwarmNode on the given port."""
-        self._node_ptr = lib.node_init(port)
+    def __init__(self, port: int, swarm_secret: str = ""):
+        """Initializes a new Tachyon node on the given port."""
+        secret_bytes = swarm_secret.encode('utf-8')
+        self._node_ptr = lib.node_init(port, secret_bytes, len(secret_bytes))
         if not self._node_ptr:
             raise RuntimeError("Failed to initialize ZeroMQ Node.")
 
@@ -148,12 +150,19 @@ class Tachyon:
         @CCallbackType
         def internal_callback(c_packet):
             try:
+                # SECURITY: Sanity checks to prevent CTypes out-of-bounds reads
+                if c_packet.topic_len < 0 or c_packet.topic_len > 1024:
+                    print("⚠️ Blocked malformed topic length at C boundary")
+                    return
+                if c_packet.vector_len < 0 or c_packet.vector_len > 10_000_000:
+                    print("⚠️ Blocked malformed vector length at C boundary")
+                    return
+
                 # Safely copy memory out of the C struct before returning
                 topic_bytes = ctypes.string_at(c_packet.topic_ptr, c_packet.topic_len)
                 topic_str = topic_bytes.decode('utf-8')
 
                 # Unpack f16s
-                import struct
                 buffer = bytes(ctypes.cast(c_packet.vector_ptr, ctypes.POINTER(ctypes.c_uint16 * c_packet.vector_len)).contents)
                 vector = list(struct.unpack(f"{c_packet.vector_len}e", buffer))
 

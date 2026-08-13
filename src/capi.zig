@@ -26,11 +26,12 @@ fn zigCallbackWrapper(packet: p2p.EmbeddingPacket) void {
     }
 }
 
-export fn node_init(pub_port: u16) ?*p2p.Node {
+export fn node_init(pub_port: u16, secret_ptr: [*]const u8, secret_len: usize) ?*p2p.Node {
     const allocator = std.heap.page_allocator;
     const node_ptr = allocator.create(p2p.Node) catch return null;
 
-    node_ptr.* = p2p.Node.init(allocator, pub_port) catch {
+    const secret = secret_ptr[0..secret_len];
+    node_ptr.* = p2p.Node.init(allocator, pub_port, secret) catch {
         allocator.destroy(node_ptr);
         return null;
     };
