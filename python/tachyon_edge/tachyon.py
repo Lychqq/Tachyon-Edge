@@ -118,7 +118,6 @@ class Tachyon:
         # In a real async/batching system, we'd need a deeper queue, but for
         # C-FFI safety here we append to a python-side list to prevent GC UAF.
 
-        import struct
         buffer = struct.pack(f"{len(vector)}e", *vector)
         encoded_arr = (ctypes.c_uint16 * len(vector)).from_buffer_copy(buffer)
 
