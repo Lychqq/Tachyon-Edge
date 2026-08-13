@@ -98,4 +98,10 @@ test "cosine similarity and distance" {
 
     const dist_large = try cosineDistance(&v_large1, &v_large2);
     try testing.expectApproxEqAbs(@as(f32, 0.0), dist_large, 1e-4);
+
+    // Test vector length mismatch error
+    const v_short = [_]f16{ 1.0, 2.0 };
+    const v_long = [_]f16{ 1.0, 2.0, 3.0 };
+    try testing.expectError(error.VectorLengthMismatch, cosineSimilarity(&v_short, &v_long));
+    try testing.expectError(error.VectorLengthMismatch, cosineDistance(&v_short, &v_long));
 }
