@@ -4,12 +4,12 @@ const builtin = @import("builtin");
 
 // Android Termux Linker Hack
 comptime {
-    if (builtin.os.tag == .android) {
+    if (builtin.os.tag == .linux and builtin.abi == .android) {
         @export(dummy_getauxval, .{ .name = "getauxval", .linkage = .strong });
     }
 }
 
-fn dummy_getauxval(type_: c_ulong) c_ulong {
+pub fn dummy_getauxval(type_: c_ulong) callconv(.C) c_ulong {
     _ = type_;
     return 0; // Return 0 hardware capabilities
 }
