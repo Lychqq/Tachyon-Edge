@@ -8,6 +8,17 @@ pub const std_options: std.Options = .{
 };
 const builtin = @import("builtin");
 
+comptime {
+    if (builtin.os.tag == .linux and builtin.abi == .android) {
+        @export(&dummy_getauxval, .{ .name = "getauxval", .linkage = .strong });
+    }
+}
+
+pub fn dummy_getauxval(type_: c_ulong) callconv(.c) c_ulong {
+    _ = type_;
+    return 0; // Hardware capabilities fallback
+}
+
 // Safe C-FFI representation of a packet
 pub const CPacket = extern struct {
     topic_ptr: [*]const u8,
