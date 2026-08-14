@@ -5,7 +5,7 @@ const builtin = @import("builtin");
 // Android Termux Linker Hack
 comptime {
     if (builtin.os.tag == .linux and builtin.abi == .android) {
-        @export(dummy_getauxval, .{ .name = "getauxval", .linkage = .strong });
+        @export(&dummy_getauxval, .{ .name = "getauxval", .linkage = .strong });
     }
 }
 
