@@ -2,17 +2,6 @@ const std = @import("std");
 const p2p = @import("p2p.zig");
 const builtin = @import("builtin");
 
-comptime {
-    if (builtin.os.tag == .linux and builtin.abi == .android) {
-        @export(&dummy_getauxval, .{ .name = "getauxval", .linkage = .strong });
-    }
-}
-
-pub fn dummy_getauxval(type_: c_ulong) callconv(.c) c_ulong {
-    if (type_ == 6) return 4096; // AT_PAGESZ
-    return 0; // HWCAP etc
-}
-
 // Safe C-FFI representation of a packet
 pub const CPacket = extern struct {
     topic_ptr: [*]const u8,
