@@ -1,5 +1,11 @@
 const std = @import("std");
 const p2p = @import("p2p.zig");
+
+// Override std options to fix Android Python CDLL thread crash
+pub const std_options = .{
+    .page_size_min = 4096,
+    .page_size_max = 65536,
+};
 const builtin = @import("builtin");
 
 // Safe C-FFI representation of a packet
