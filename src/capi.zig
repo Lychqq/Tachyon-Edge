@@ -15,8 +15,10 @@ comptime {
 }
 
 pub fn dummy_getauxval(type_: c_ulong) callconv(.c) c_ulong {
-    _ = type_;
-    return 0; // Hardware capabilities fallback
+    return switch (type_) {
+        6 => 4096,  // AT_PAGESZ - critical! prevents divide-by-zero in thread stack alloc
+        else => 0,
+    };
 }
 
 // Safe C-FFI representation of a packet
