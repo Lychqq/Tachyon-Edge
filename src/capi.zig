@@ -9,7 +9,7 @@ comptime {
     }
 }
 
-pub fn dummy_getauxval(type_: c_ulong) callconv(.C) c_ulong {
+pub fn dummy_getauxval(type_: c_ulong) callconv(.c) c_ulong {
     _ = type_;
     return 0; // Return 0 hardware capabilities
 }
