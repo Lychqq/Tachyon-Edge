@@ -4,12 +4,20 @@
 
 Written in **100% pure Zig (v0.17)** without any external dependencies (no ZeroMQ, no bulky libraries).
 
+> [!NOTE]
+> **Educational & Experimental Project**
+> This project was created for educational purposes to explore **Zig (v0.17)** syntax, C-FFI bindings, and P2P networking concepts in pair-programming with an **AI assistant**.
+> 
+> **Platform Status:**
+> - **Desktop (Windows / Linux x86_64)**: Fully functional.
+> - **Mobile (Android / Termux aarch64)**: Currently **experimental / does not launch** due to low-level Bionic libc linker and threading constraints on Android. Contributions/PRs to resolve Android support are welcome!
+
 ## Features
 - **Pure Zig Core**: Uses `std.Io` for asynchronous, high-performance networking.
 - **Zero Configuration Discovery**: Automatic UDP-based local network peer discovery. Just call `start_discovery()` and nodes find each other on Wi-Fi.
 - **End-to-End Encryption**: Every TCP connection is secured natively using **X25519** key exchange and **ChaCha20Poly1305** authenticated encryption.
 - **Python Integration**: First-class support for Python (`pip install tachyon_edge`). Perfect for direct integration into LangChain, Ollama hooks, or any AI pipeline.
-- **Cross-Platform**: Compiles out-of-the-box to Windows, Linux, and Android.
+- **Cross-Platform Target**: Desktop-first architecture (Windows, Linux) with experimental Android targets.
 
 ## Installation
 
